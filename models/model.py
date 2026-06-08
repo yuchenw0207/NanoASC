@@ -167,7 +167,7 @@ class AttentionPooling1d(nn.Module):
         return pooled, weight
 
 
-class ReadCurrentTargetRegion(nn.Module):
+class NanoASC(nn.Module):
     """
     A task-oriented ReadCurrent variant for target-region adaptive sequencing.
 

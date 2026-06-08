@@ -11,9 +11,7 @@ from sklearn.utils import shuffle
 
 from dataset import Dataset
 from tester import test
-from models.readcurrent_fre import ReadCurrentTimeFreqFusionGated
-from models.newmodel1 import ReadCurrentTargetRegion
-#from models.tfmda_replaced_model import ReadCurrentTimeFreqFusionGated
+from models.model import NanoASC
 
 
 def myprint(string, log):
@@ -40,8 +38,7 @@ def plot(train_acc, train_loss, valid_acc, valid_loss):
 
 
 def train(model, pos_train_generator, neg_train_generator, pos_valid_generator, neg_valid_generator, log, device):
-	#criterion = nn.CrossEntropyLoss()
-	#optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+
 	criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 	optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=1e-4)
 	scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -49,7 +46,7 @@ def train(model, pos_train_generator, neg_train_generator, pos_valid_generator, 
 
 	train_acc, valid_acc, train_loss, valid_loss = [], [], [], []
 	train_acc_count, train_loss_count, best_acc, best_loss = 0, 0, 0, 1e7
-	total_time, pos_epoch, neg_epoch = 0, 1, 1
+	pos_epoch, neg_epoch = 1, 1
 	patience, scheduler_num, i = 0, 0, 0
 
 	neg_iter = neg_train_generator.__iter__()
@@ -78,7 +75,6 @@ def train(model, pos_train_generator, neg_train_generator, pos_valid_generator, 
 			spx, spy = spx.type(torch.FloatTensor).to(device), spy.type(torch.LongTensor).to(device)
 
 			spx_time = spx[:, :3000]
-			spx_fre  = spx[:, 3000:]
 
 			
 			# Forward pass
@@ -131,7 +127,6 @@ def train(model, pos_train_generator, neg_train_generator, pos_valid_generator, 
 						# Forward pass
 
 						valx_time = valx[:, :3000]
-						valx_fre  = valx[:, 3000:]
 						outputs_val = model(valx_time)
 						# Calculate accuracy and loss
 						loss_v = criterion(outputs_val, valy)
@@ -190,12 +185,7 @@ if __name__ == '__main__':
 	parser.add_argument("--neg_data_folder", '-n', type=str, required=True, help="Path to the negative dataset folder that contains train, valid, test files (.npy)")
 	parser.add_argument("--output", '-o', type=str, required=True, help="The output path")
 	parser.add_argument("--cut", '-c', type=int, default=0, help="Electrical signal length to be cut, default 0")
-	parser.add_argument("--tiling_fold", '-tf', type=int, default=3, help="Number of tiles, default 3")
 	parser.add_argument("--length", '-l', type=int, default=3000, help="The length of the sliding window, default 3000")
-	parser.add_argument("--patches", '-patches', action='store_true', help="Convert electrical signals into patches, default False")
-	parser.add_argument("--seq_length", '-sl', type=int, default=299, help="Sequence length after patch, default 299")
-	parser.add_argument("--stride", '-s', type=int, default=10, help="Patch step size, default 10")
-	parser.add_argument("--patch_size", '-ps', type=int, default=16, help="The size of patch, default 16")
 	parser.add_argument("--batch_size", '-b', type=int, default=1024, help="Batch size, default 1024")
 	parser.add_argument("--epochs", '-e', type=int, default=300, help="Number of epoches, default 300")
 	parser.add_argument("--learning_rate", '-lr', type=float, default=1e-3, help="Learning rate, default 1e-3")
@@ -215,7 +205,7 @@ if __name__ == '__main__':
 		myprint(f"{arg}: {getattr(args, arg)}", log)
 
 	# Load model
-	model = ReadCurrentTargetRegion(
+	model = NanoASC(
     n_conv_neurons=[64, 64, 128, 256, 512],
     n_fc_neurons=512,
     depth=17,
@@ -229,24 +219,6 @@ if __name__ == '__main__':
     attn_hidden=128,
     head_dropout=0.2,
 )
-	#model = ReadCurrentSincFusion(
-    #[32, 64, 128, 256, 512],
-    #n_fc_neurons=1024,
-    #n_classes=2,
-    #depth=29,
-    #shortcut=True,
-    #fusion_dim=256,
-    #dropout=0.25,
-    #gate_hidden=128,
-    #sample_rate=4000.0,  # 如果你的真实采样率是 4 kHz，建议改成 4000
-#)
-
-	# model = HybridReadCurrentSE()
-	# model = ReadCurrentTimeFreqFusionGated([32, 64, 128, 256, 512], n_fc_neurons=1024, n_classes=2, depth=29, shortcut=True, fusion_dim=256,dropout=0.25,gate_hidden=128)
-	# model = LSTM(args.patch_size, 512, 2, True)
-	# model = CNN_LSTM(512, 2, True)
-	# model = Transformer(args.patch_size, args.seq_length, 512, 2048, 8, 6, 0.1, use_bias=True)
-	# model = CNN_Transformer(512, 2048, 8, 6, 0.1, use_bias=True)
 
 	# Use GPU or CPU
 
@@ -312,10 +284,8 @@ if __name__ == '__main__':
 	myprint(f'Load the negative test set from {os.path.join(args.neg_data_folder, "test.npy")}, shape {neg_test_data.shape}', log)
 
 	model.load_state_dict(torch.load(os.path.join(args.output, "model.pth")))
-	tp, fn, pos_infer_time = test(model, pos_test_data, 1, args.batch_size, args.cut, args.length,
-			  args.patches, args.seq_length, args.stride, args.patch_size, log, device)
-	tn, fp, neg_infer_time = test(model, neg_test_data, 0, args.batch_size, args.cut, args.length,
-			  args.patches, args.seq_length, args.stride, args.patch_size, log, device)
+	tp, fn, pos_infer_time = test(model, pos_test_data, 1, args.batch_size, args.cut, args.length, log, device)
+	tn, fp, neg_infer_time = test(model, neg_test_data, 0, args.batch_size, args.cut, args.length, log, device)
 
 	# Calculate evaluation index values
 	accuracy = round((tp + tn) * 100 / (tp + tn + fp + fn), 2)

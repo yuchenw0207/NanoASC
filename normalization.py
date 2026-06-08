@@ -4,13 +4,6 @@ import numpy as np
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 
-
-def cut_patchs(signal, seq_length, stride, patch_size):
-    split_signal = np.zeros((patch_size, seq_length), dtype=np.float32)
-    for i in range(seq_length):
-        split_signal[:, i] = signal[(i * stride):(i * stride) + patch_size]
-    return split_signal
-
 def modified_zscore(signal, mad_threshold=3.5, consistency_correction=1.4826):
 	median = np.median(signal)
 	dev_from_med = np.array(signal) - median
@@ -39,7 +32,7 @@ def _chunkify_data(data, batch_size):
 
 
 def _process_train_chunk(task):
-    data_chunk, cut, length, tile, tile_idx, patches, seq_length, stride, patch_size = task
+    data_chunk, cut, length, tile, tile_idx = task
 
     step = length // tile
     start = tile_idx * step
@@ -57,9 +50,6 @@ def _process_train_chunk(task):
                 signal[end - length:end]
             )
 
-            if patches:
-                segment = cut_patchs(segment, seq_length, stride, patch_size)
-
             segment_arr.append(segment.astype(np.float16, copy=False))
             end += length
 
@@ -70,7 +60,7 @@ def _process_train_chunk(task):
 
 
 def _process_valid_chunk(task):
-    data_chunk, cut, length, patches, seq_length, stride, patch_size = task
+    data_chunk, cut, length = task
     segment_arr = []
 
     for signal in data_chunk:
@@ -80,9 +70,6 @@ def _process_valid_chunk(task):
         segment = modified_zscore(
             signal[cut:cut + length]
         )
-
-        if patches:
-            segment = cut_patchs(segment, seq_length, stride, patch_size)
 
         segment_arr.append(segment.astype(np.float16, copy=False))
 
@@ -99,10 +86,6 @@ def save_train_batches(
     cut,
     length,
     tile,
-    patches,
-    seq_length,
-    stride,
-    patch_size,
     batch_size=5000,
     processes=4,
 ):
@@ -128,10 +111,6 @@ def save_train_batches(
                             length,
                             tile,
                             tile_idx,
-                            patches,
-                            seq_length,
-                            stride,
-                            patch_size,
                         )
                     )
 
@@ -159,10 +138,6 @@ def save_valid_batches(
     prefix,
     cut,
     length,
-    patches,
-    seq_length,
-    stride,
-    patch_size,
     batch_size=5000,
     processes=4,
 ):
@@ -181,10 +156,6 @@ def save_valid_batches(
                 chunk,
                 cut,
                 length,
-                patches,
-                seq_length,
-                stride,
-                patch_size,
             )
             for chunk in sub_chunks
             if len(chunk) > 0
@@ -214,10 +185,6 @@ if __name__ == "__main__":
     parser.add_argument("--cut", "-c", type=int, default=1500)
     parser.add_argument("--tiling_fold", "-tf", type=int, default=3)
     parser.add_argument("--length", "-l", type=int, default=3000)
-    parser.add_argument("--patches", "-patches", action="store_true")
-    parser.add_argument("--seq_length", "-sl", type=int, default=299)
-    parser.add_argument("--stride", "-s", type=int, default=10)
-    parser.add_argument("--patch_size", "-ps", type=int, default=16)
     parser.add_argument("--processes", "-p", type=int, default=4)
     parser.add_argument("--batch_size", "-bs", type=int, default=5000)
 
@@ -244,10 +211,6 @@ if __name__ == "__main__":
         cut=args.cut,
         length=args.length,
         tile=args.tiling_fold,
-        patches=args.patches,
-        seq_length=args.seq_length,
-        stride=args.stride,
-        patch_size=args.patch_size,
         batch_size=args.batch_size,
         processes=args.processes,
     )
@@ -259,10 +222,6 @@ if __name__ == "__main__":
         prefix="valid_sw",
         cut=args.cut,
         length=args.length,
-        patches=args.patches,
-        seq_length=args.seq_length,
-        stride=args.stride,
-        patch_size=args.patch_size,
         batch_size=args.batch_size,
         processes=args.processes,
     )

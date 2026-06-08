@@ -4,62 +4,10 @@ import time
 import argparse
 from torch import nn
 import numpy as np
-from models.newmodel1 import ReadCurrentTargetRegion
+from models.model import NanoASC
 
 MAD_SCORE = 3
 REPEATED = False
-#from models.tfmda_replaced_model import ReadCurrentTimeFreqFusionGated
-def sliding_window_normalization(signal, length=3000, window_length=400, step=400):
-    if not isinstance(signal, np.ndarray):
-        signal = np.array(signal)
-
-    if len(signal) < length:
-        raise ValueError(f"输入信号长度必须为{length}，实际为 {len(signal)}")
-
-    n = len(signal)
-    normalized_signal = np.zeros_like(signal, dtype=np.float64)
-
-    # 计算窗口数
-    num_windows = (n - window_length) // step + 1
-
-    last_mean = None
-    last_std = None
-
-    for i in range(num_windows):
-        start = i * step
-        end = start + window_length
-        if end > n:
-            end = n
-
-        window = signal[start:end]
-        mean = np.mean(window)
-        std = np.std(window)
-        if std < 1e-10:
-            std = 1e-10
-
-        normalized_window = (window - mean) / std
-        normalized_signal[start:end] = normalized_window
-
-        # 记录最后一个完整窗口的统计量
-        last_mean = mean
-        last_std = std
-
-    # 处理最后不足一个窗口长度的尾巴
-    # 找到最后一个窗口的结束位置
-    last_start = (num_windows - 1) * step
-    last_end = last_start + window_length
-    if last_end < n:
-        # 如果你想用“最后一个完整窗口”的统计量：
-        mean = last_mean
-        std = last_std
-
-        if std < 1e-10:
-            std = 1e-10
-
-        tail_start = last_end
-        normalized_signal[tail_start:] = (signal[tail_start:] - mean) / std
-
-    return normalized_signal
 
 def modified_zscore(data, consistency_correction=1.4826):
     """
@@ -99,13 +47,6 @@ def modified_zscore(data, consistency_correction=1.4826):
 
     return np.asarray(mad_score, dtype=np.float32)
 
-def cut_patchs(signal, seq_length, stride, patch_size):
-	split_signal = np.zeros((patch_size, seq_length), dtype="float32")
-	for i in range(seq_length):
-		split_signal[:, i] = signal[(i*stride):(i*stride)+patch_size]
-	return split_signal
-
-
 def myprint(string, log):
 	log.write(string+'\n')
 	print(string)
@@ -128,8 +69,7 @@ def inference(inputs, model, label, device):
 
 
 
-def test(model, reads, label, batch_size, cut, length,
-			  patches, seq_length, stride, patch_size, log, device):
+def test(model, reads, label, batch_size, cut, length, log, device):
 	model.to(device)
 	model.eval()
 	with torch.no_grad():
@@ -144,10 +84,6 @@ def test(model, reads, label, batch_size, cut, length,
 				continue
 			accepted_reads += 1
 			read = modified_zscore(read[cut:cut+length])
-			#read = sliding_window_normalization(read[cut:cut+length])
-			#read = extract_time_freq_features_real(read)
-			if patches:
-				read = cut_patchs(read, seq_length, stride, patch_size)
 			inputs.append(read)
 
 			if accepted_reads % batch_size == 0 and accepted_reads != 0:
@@ -185,10 +121,6 @@ if __name__ == '__main__':
 	parser.add_argument("--batch_size", '-b', type=int, default=512, help="Batch size, default 512")
 	parser.add_argument("--cut", '-c', type=int, default=0, help="Electrical signal length to be cut, default 0")
 	parser.add_argument("--length", '-len', type=int, default=3000, help="The length of each signal segment, default 3000")
-	parser.add_argument("--patches", '-patches', action='store_true', help="Convert electrical signals into patches, default False")
-	parser.add_argument("--seq_length", '-sl', type=int, default=299, help="Sequence length after patch, default 299")
-	parser.add_argument("--stride", '-s', type=int, default=10, help="Patch step size, default 10")
-	parser.add_argument("--patch_size", '-ps', type=int, default=16, help="The size of patch, default 16")
 	parser.add_argument("--gpu_ids", '-g', type=str, default=None, help="Specify the GPU to use, if not specified, use all GPUs or CPU, default None")
 	args = parser.parse_args()
 
@@ -203,7 +135,7 @@ if __name__ == '__main__':
 
 	# Load model
 
-	model = ReadCurrentTargetRegion(
+	model = NanoASC(
     n_conv_neurons=[64, 64, 128, 256, 512],
     n_fc_neurons=512,
     depth=17,
@@ -217,11 +149,6 @@ if __name__ == '__main__':
     attn_hidden=128,
     head_dropout=0.2,
 )
-	# model = ReadCurrentTimeFreqFusionGated([32, 64, 128, 256, 512], n_fc_neurons=1024, n_classes=2, depth=29, shortcut=True, fusion_dim=256,dropout=0.25,gate_hidden=128)
-	# model = LSTM(args.patch_size, 512, 2, True)
-	# model = CNN_LSTM(512, 2, True)
-	# model = Transformer(args.patch_size, args.seq_length, 512, 2048, 8, 6, 0.1, use_bias=True)
-	# model = CNN_Transformer(512, 2048, 8, 6, 0.1, use_bias=True)
 
 	# Use GPU or CPU
 	if args.gpu_ids:
@@ -237,13 +164,11 @@ if __name__ == '__main__':
 	# Load dataset and testing
 	reads = np.load(os.path.join(args.pos_data_folder, "test.npy"), allow_pickle=True)
 	myprint(f"Load positive test data from {os.path.join(args.pos_data_folder, 'test.npy')}, shape: {reads.shape}", log)
-	tp, fn, pos_infer_time = test(model, reads, 1, args.batch_size, args.cut, args.length,
-		args.patches, args.seq_length, args.stride, args.patch_size, log, device)
+	tp, fn, pos_infer_time = test(model, reads, 1, args.batch_size, args.cut, args.length, log, device)
 	
 	reads = np.load(os.path.join(args.neg_data_folder, "test.npy"), allow_pickle=True)
 	myprint(f"Load negative test data from {os.path.join(args.neg_data_folder, 'test.npy')}, shape: {reads.shape}", log)
-	tn, fp, neg_infer_time = test(model, reads, 0, args.batch_size, args.cut, args.length,
-		args.patches, args.seq_length, args.stride, args.patch_size, log, device)
+	tn, fp, neg_infer_time = test(model, reads, 0, args.batch_size, args.cut, args.length, log, device)
 
 	# Calculate evaluation index values
 	accuracy = round((tp + tn) * 100 / (tp + tn + fp + fn), 2)
