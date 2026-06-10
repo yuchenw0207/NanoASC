@@ -58,11 +58,11 @@ pod5==0.3.28
 
 Process one or more panel-mapped BAM files to generate target-region signal-position TSVs, filter qualified non-split reads, and create four-fold train/valid/test TSV splits.
 
-| Parameter          | Description                                                  |
-| ------------------ | ------------------------------------------------------------ |
-| `<panel_bed_path>` | Target panel selector or a direct BED file path. Supported selectors are `148`, `odd`, and `all`. They map to `panel_bed/148_genes.bed`, `panel_bed/odd_cosmic_genes.bed`, and `panel_bed/all_cosmic_genes.bed`. If the value is not one of these selectors, it is treated as a BED file path. |
-| `<bam_dir>`        | Directory containing one or more panel-mapped BAM files. Files ending in `.bam` or `.BAM` are processed. |
-| `<out_dir>`        | Output directory. The script creates intermediate and final TSV outputs under this directory. |
+| Parameter     | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `<panel_bed>` | Target panel selector or a direct BED file path. Supported selectors are `148`, `odd`, and `all`. They map to `panel_bed/148_genes.bed`, `panel_bed/odd_cosmic_genes.bed`, and `panel_bed/all_cosmic_genes.bed`. If the value is not one of these selectors, it is treated as a BED file path. |
+| `<bam_dir>`   | Directory containing one or more panel-mapped BAM files. Files ending in `.bam` or `.BAM` are processed. |
+| `<out_dir>`   | Output directory. The script creates intermediate and final TSV outputs under this directory. |
 
 The input BAM files should contain the tags `mv` and `ts`; split-read cases may also use `pi` and `sp`.
 
