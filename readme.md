@@ -60,7 +60,7 @@ Process one or more panel-mapped BAM files to generate target-region signal-posi
 
 | Parameter          | Description                                                  |
 | ------------------ | ------------------------------------------------------------ |
-| `<panel|bed_path>` | Target panel selector or a direct BED file path. Supported selectors are `148`, `odd`, and `all`. They map to `panel_bed/148_genes.bed`, `panel_bed/odd_cosmic_genes.bed`, and `panel_bed/all_cosmic_genes.bed`. If the value is not one of these selectors, it is treated as a BED file path. |
+| `<panel_bed_path>` | Target panel selector or a direct BED file path. Supported selectors are `148`, `odd`, and `all`. They map to `panel_bed/148_genes.bed`, `panel_bed/odd_cosmic_genes.bed`, and `panel_bed/all_cosmic_genes.bed`. If the value is not one of these selectors, it is treated as a BED file path. |
 | `<bam_dir>`        | Directory containing one or more panel-mapped BAM files. Files ending in `.bam` or `.BAM` are processed. |
 | `<out_dir>`        | Output directory. The script creates intermediate and final TSV outputs under this directory. |
 
@@ -87,7 +87,7 @@ Extract positive and negative raw signal samples from `pod5` or `fast5` data usi
 | `<split_dir>`     | Four-fold split directory. It should contain `fold0/fold1/fold2/fold3`; `fold_0/fold_1/fold_2/fold_3` are also accepted. Each fold directory must contain `train.tsv`, `valid.tsv`, and `test.tsv`. |
 | `<out_dir>`       | Root output directory. The script creates `pos/` and `neg/` under this directory. |
 | `<panel_bam_dir>` | Directory containing panel-mapped BAM files. Unmapped read IDs from these BAM files are used as the negative-sample source. |
-| `<pod5|fast5>`    | Raw signal type. Must be either `pod5` or `fast5`.           |
+| `<pod5/fast5>`    | Raw signal type. Must be either `pod5` or `fast5`.           |
 
 Examples:
 
